@@ -28,7 +28,14 @@
               </label>
               <label>
                 <div class="mini">Fælles adgangskode</div>
-                <input id="loginPassword" class="input" type="password" placeholder="••••••••" />
+                <div class="row">
+                  <input id="loginPassword" class="input" type="password" placeholder="••••••••" />
+                  <button id="togglePasswordBtn" class="btn secondary" type="button" aria-label="Vis eller skjul password">Vis</button>
+                </div>
+              </label>
+              <label class="row">
+                <input id="rememberLogin" type="checkbox" checked />
+                <span class="mini">Husk login på denne enhed</span>
               </label>
               <div class="row">
                 <button id="loginBtn" class="btn" type="button">Log ind</button>
@@ -54,6 +61,7 @@
     <div id="setupNotice" class="warning hidden"></div>
     <div id="globalMessage" class="success-box hidden"></div>
     <div id="globalError" class="warning hidden"></div>
+    <div id="lastUpdated" class="mini hidden"></div>
 
     <section id="appArea" class="grid hidden">
       <article class="card">
@@ -97,6 +105,11 @@
           </div>
 
           <div id="memberActionBox"></div>
+
+          <div id="quickActions" class="row top-gap hidden">
+            <button id="quickAttendBtn" class="btn" type="button">✅ Jeg deltager</button>
+            <button id="quickAbsentBtn" class="btn danger" type="button">❌ Jeg deltager ikke</button>
+          </div>
 
           <div id="attendanceForm" class="panel-box hidden">
             <h3>Min tilmelding</h3>
@@ -173,6 +186,21 @@
                         <input id="sharedPasswordInput" class="input" type="text" placeholder="Fælles password" />
                       </label>
                       <button id="saveReminderBtn" class="btn" type="button">Gem indstillinger</button>
+                    </div>
+                  </div>
+
+                  <div class="panel-box">
+                    <div class="panel-content stack">
+                      <div class="mini"><strong>Klar til påmindelse</strong></div>
+                      <div id="reminderPreview" class="mini">Ingen påmindelser klar endnu.</div>
+                      <div class="row">
+                        <button id="copyReminderBtn" class="btn secondary" type="button">Kopiér tekst</button>
+                        <button id="openReminderMailBtn" class="btn secondary" type="button">Åbn mail</button>
+                      </div>
+                      <div class="row">
+                        <button id="copyPhonesBtn" class="btn secondary" type="button">Kopiér telefonliste</button>
+                        <button id="exportReminderCsvBtn" class="btn secondary" type="button">Eksportér reminder CSV</button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -288,6 +316,7 @@
                     <div class="panel-content stack">
                       <button id="refreshBtn" class="btn secondary" type="button">Opdatér data</button>
                       <button id="exportBtn" class="btn secondary" type="button">Eksportér data som JSON</button>
+                      <button id="exportCsvBtn" class="btn secondary" type="button">Eksportér køkkenliste som CSV</button>
                       <div class="mini">
                         Denne version kræver, at du udfylder <code>supabase-config.js</code> og kører SQL-filerne i mappen <code>database</code> i Supabase først.
                       </div>
