@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Logeaftener</title>
+  <title>Tilmelding til logeaftener</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -11,10 +11,10 @@
     <section class="hero">
       <div class="hero-top">
         <div>
-          <h1>Logeaftener</h1>
+          <h1>Tilmelding til logeaftener</h1>
           <p>
-            Tilmelding til logeaftener
-            Her kan du tilmelde dig kommende logeaftener, se hvem der deltager og ændre din egen status.
+            Her kan du se kommende logeaftener, tilmelde dig og ændre din status.
+            Admin kan oprette aftener, opdatere medlemsoplysninger og bevare overblikket.
           </p>
         </div>
 
@@ -41,7 +41,7 @@
                 <button id="loginBtn" class="btn" type="button">Log ind</button>
               </div>
               <div class="mini">
-                Indtast dit fulde navn og den fælles adgangskode.
+                Indtast dit fulde navn og den fælles adgangskode for at åbne oversigten.
               </div>
             </div>
           </div>
@@ -66,8 +66,8 @@
     <section id="appArea" class="grid hidden">
       <article class="card">
         <div class="card-header">
-          <h2>Kommende aftener</h2>
-          <div class="muted">Vælg en logeaften for at se eller ændre status.</div>
+          <h2>Kommende logeaftener</h2>
+          <div class="muted">Vælg en logeaften for at se overblik og ændre din status.</div>
         </div>
         <div class="card-body">
           <div id="eventList" class="event-list"></div>
@@ -77,7 +77,7 @@
       <article class="card">
         <div class="card-header">
           <h2>Overblik</h2>
-          <div class="muted">Denne version bruger Supabase som fælles database.</div>
+          <div class="muted">Her ser du deltagelse og oplysninger for den valgte logeaften.</div>
         </div>
         <div class="card-body">
           <div class="stats">
@@ -94,7 +94,7 @@
               <div id="totalCount" class="stat-value">0</div>
             </div>
             <div class="stat">
-              <div class="stat-label">Afmeldingsfrist</div>
+              <div class="stat-label">Frist for ændringer</div>
               <div id="deadlineText" class="stat-value compact">–</div>
             </div>
           </div>
@@ -166,7 +166,7 @@
             <div id="adminArea" class="hidden">
 
               <details class="admin-section">
-                <summary>Admin – påmindelser</summary>
+                <summary>Påmindelser</summary>
                 <div class="admin-grid top-gap">
                   <div class="panel-box">
                     <div class="panel-content stack">
@@ -184,7 +184,7 @@
                       </label>
                       <label>
                         <div class="mini">Fælles adgangskode</div>
-                        <input id="sharedPasswordInput" class="input" type="text" placeholder="Fælles password" />
+                        <input id="sharedPasswordInput" class="input" type="text" placeholder="Fælles adgangskode" />
                       </label>
                       <button id="saveReminderBtn" class="btn" type="button">Gem indstillinger</button>
                     </div>
@@ -208,7 +208,7 @@
               </details>
 
               <details class="admin-section">
-                <summary>Admin – ny logeaften</summary>
+                <summary>Opret logeaften</summary>
                 <div class="admin-grid top-gap">
                   <div class="panel-box">
                     <div class="panel-content stack">
@@ -239,7 +239,7 @@
               </details>
 
               <details class="admin-section">
-                <summary>Admin – rediger logeaften</summary>
+                <summary>Rediger logeaften</summary>
                 <div class="admin-grid top-gap">
                   <div class="panel-box">
                     <div class="panel-content stack">
@@ -277,7 +277,7 @@
               </details>
 
               <details class="admin-section">
-                <summary>Admin – medlemmer</summary>
+                <summary>Medlemmer</summary>
                 <div class="admin-grid top-gap">
                   <div class="panel-box">
                     <div class="panel-content stack">
@@ -311,7 +311,7 @@
               </details>
 
               <details class="admin-section">
-                <summary>Admin – system og overblik</summary>
+                <summary>Overblik og eksport</summary>
                 <div class="admin-grid top-gap">
                   <div class="panel-box">
                     <div class="panel-content stack">
@@ -319,7 +319,7 @@
                       <button id="exportBtn" class="btn secondary" type="button">Eksportér data som JSON</button>
                       <button id="exportCsvBtn" class="btn secondary" type="button">Eksportér køkkenliste som CSV</button>
                       <div class="mini">
-                        Denne version kræver, at du udfylder <code>supabase-config.js</code> og kører SQL-filerne i mappen <code>database</code> i Supabase først.
+                        Sørg for, at <code>supabase-config.js</code> er udfyldt, og at tabeller samt policies er oprettet korrekt i Supabase.
                       </div>
                     </div>
                   </div>
