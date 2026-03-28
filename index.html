@@ -31,7 +31,7 @@
                 <input id="loginPassword" class="input" type="password" placeholder="••••••••" />
               </label>
               <div class="row">
-                <button id="loginBtn" class="btn">Log ind</button>
+                <button id="loginBtn" class="btn" type="button">Log ind</button>
               </div>
               <div class="mini">
                 Du skriver dit fulde navn og bruger det fælles password. Denne løsning er enkel og egner sig bedst til intern brug og opstart.
@@ -150,146 +150,161 @@
 
           <div id="adminPanel" class="hidden">
             <div id="adminArea" class="hidden">
-              <div class="admin-grid">
-                <div class="panel-box">
-                  <h3>Admin – påmindelser</h3>
-                  <div class="panel-content stack">
-                    <label>
-                      <div class="mini">Send påmindelse antal dage før</div>
-                      <input id="reminderDaysInput" class="input" type="number" min="0" max="14" />
-                    </label>
-                    <label>
-                      <div class="mini">Påmindelseskanal</div>
-                      <select id="reminderChannelInput" class="select">
-                        <option value="mail">Mail</option>
-                        <option value="sms">SMS</option>
-                        <option value="begge">Mail + SMS</option>
-                      </select>
-                    </label>
-                    <label>
-                      <div class="mini">Fælles adgangskode</div>
-                      <input id="sharedPasswordInput" class="input" type="text" placeholder="Fælles password" />
-                    </label>
-                    <button id="saveReminderBtn" class="btn" type="button">Gem indstillinger</button>
-                  </div>
-                </div>
 
-                <div class="panel-box">
-                  <h3>Admin – ny logeaften</h3>
-                  <div class="panel-content stack">
-                    <label>
-                      <div class="mini">Titel</div>
-                      <input id="newEventTitle" class="input" type="text" placeholder="Fx Ordinær logeaften" />
-                    </label>
-                    <label>
-                      <div class="mini">Dato</div>
-                      <input id="newEventDate" class="input" type="date" />
-                    </label>
-                    <label>
-                      <div class="mini">Tid</div>
-                      <input id="newEventTime" class="input" type="time" value="19:00" />
-                    </label>
-                    <label>
-                      <div class="mini">Sted</div>
-                      <input id="newEventLocation" class="input" type="text" value="Frederiksgade 15, Slagelse" />
-                    </label>
-                    <label>
-                      <div class="mini">Frist for afmelding (dage før)</div>
-                      <input id="newEventDeadlineDays" class="input" type="number" min="0" max="14" value="2" />
-                    </label>
-                    <button id="addEventBtn" class="btn" type="button">Opret logeaften</button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="admin-grid">
-                <div class="panel-box">
-                  <h3>Admin – rediger logeaften</h3>
-                  <div class="panel-content stack">
-                    <label>
-                      <div class="mini">Vælg logeaften</div>
-                      <select id="eventAdminSelect" class="select"></select>
-                    </label>
-                    <label>
-                      <div class="mini">Titel</div>
-                      <input id="editEventTitle" class="input" type="text" placeholder="Fx Ordinær logeaften" />
-                    </label>
-                    <label>
-                      <div class="mini">Dato</div>
-                      <input id="editEventDate" class="input" type="date" />
-                    </label>
-                    <label>
-                      <div class="mini">Tid</div>
-                      <input id="editEventTime" class="input" type="time" />
-                    </label>
-                    <label>
-                      <div class="mini">Sted</div>
-                      <input id="editEventLocation" class="input" type="text" />
-                    </label>
-                    <label>
-                      <div class="mini">Frist for afmelding (dage før)</div>
-                      <input id="editEventDeadlineDays" class="input" type="number" min="0" max="14" />
-                    </label>
-                    <div class="row">
-                      <button id="saveEventBtn" class="btn" type="button">Gem logeaften</button>
-                      <button id="deleteEventBtn" class="btn danger" type="button">Slet logeaften</button>
+              <details class="admin-section">
+                <summary>Admin – påmindelser</summary>
+                <div class="admin-grid top-gap">
+                  <div class="panel-box">
+                    <div class="panel-content stack">
+                      <label>
+                        <div class="mini">Send påmindelse antal dage før</div>
+                        <input id="reminderDaysInput" class="input" type="number" min="0" max="14" />
+                      </label>
+                      <label>
+                        <div class="mini">Påmindelseskanal</div>
+                        <select id="reminderChannelInput" class="select">
+                          <option value="mail">Mail</option>
+                          <option value="sms">SMS</option>
+                          <option value="begge">Mail + SMS</option>
+                        </select>
+                      </label>
+                      <label>
+                        <div class="mini">Fælles adgangskode</div>
+                        <input id="sharedPasswordInput" class="input" type="text" placeholder="Fælles password" />
+                      </label>
+                      <button id="saveReminderBtn" class="btn" type="button">Gem indstillinger</button>
                     </div>
                   </div>
                 </div>
+              </details>
 
-                <div class="panel-box">
-                  <h3>Admin – medlemmer</h3>
-                  <div class="panel-content stack">
-                    <label>
-                      <div class="mini">Vælg broder</div>
-                      <select id="memberAdminSelect" class="select"></select>
-                    </label>
-                    <label>
-                      <div class="mini">Mail</div>
-                      <input id="memberEmailInput" class="input" type="email" placeholder="navn@eksempel.dk" />
-                    </label>
-                    <label>
-                      <div class="mini">Telefon</div>
-                      <input id="memberPhoneInput" class="input" type="text" placeholder="12 34 56 78" />
-                    </label>
-                    <label class="row">
-                      <input id="memberOptInOnlyInput" type="checkbox" />
-                      <span class="mini">Ikke automatisk tilmeldt</span>
-                    </label>
-                    <label>
-                      <div class="mini">Rolle</div>
-                      <select id="memberRoleInput" class="select">
-                        <option value="member">Broder</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </label>
-                    <button id="saveMemberBtn" class="btn" type="button">Gem medlem</button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="admin-grid">
-                <div class="panel-box">
-                  <h3>Admin – system</h3>
-                  <div class="panel-content stack">
-                    <button id="refreshBtn" class="btn secondary" type="button">Opdatér data</button>
-                    <button id="exportBtn" class="btn secondary" type="button">Eksportér data som JSON</button>
-                    <div class="mini">
-                      Denne version kræver, at du udfylder <code>supabase-config.js</code> og kører SQL-filerne i mappen <code>database</code> i Supabase først.
+              <details class="admin-section">
+                <summary>Admin – ny logeaften</summary>
+                <div class="admin-grid top-gap">
+                  <div class="panel-box">
+                    <div class="panel-content stack">
+                      <label>
+                        <div class="mini">Titel</div>
+                        <input id="newEventTitle" class="input" type="text" placeholder="Fx Ordinær logeaften" />
+                      </label>
+                      <label>
+                        <div class="mini">Dato</div>
+                        <input id="newEventDate" class="input" type="date" />
+                      </label>
+                      <label>
+                        <div class="mini">Tid</div>
+                        <input id="newEventTime" class="input" type="time" value="19:00" />
+                      </label>
+                      <label>
+                        <div class="mini">Sted</div>
+                        <input id="newEventLocation" class="input" type="text" value="Frederiksgade 15, Slagelse" />
+                      </label>
+                      <label>
+                        <div class="mini">Frist for afmelding (dage før)</div>
+                        <input id="newEventDeadlineDays" class="input" type="number" min="0" max="14" value="2" />
+                      </label>
+                      <button id="addEventBtn" class="btn" type="button">Opret logeaften</button>
                     </div>
                   </div>
                 </div>
+              </details>
 
-                <div class="panel-box">
-                  <h3>Admin – overblik over mad og gæster</h3>
-                  <div class="panel-content stack">
-                    <div class="mini">Mad til brødre: <strong id="mealsCount">0</strong></div>
-                    <div class="mini">Antal gæster: <strong id="guestCount">0</strong></div>
-                    <div class="mini">Mad til gæster: <strong id="guestMealsCount">0</strong></div>
-                    <div class="mini">Samlet antal kuverter: <strong id="totalMealsCount">0</strong></div>
+              <details class="admin-section">
+                <summary>Admin – rediger logeaften</summary>
+                <div class="admin-grid top-gap">
+                  <div class="panel-box">
+                    <div class="panel-content stack">
+                      <label>
+                        <div class="mini">Vælg logeaften</div>
+                        <select id="eventAdminSelect" class="select"></select>
+                      </label>
+                      <label>
+                        <div class="mini">Titel</div>
+                        <input id="editEventTitle" class="input" type="text" placeholder="Fx Ordinær logeaften" />
+                      </label>
+                      <label>
+                        <div class="mini">Dato</div>
+                        <input id="editEventDate" class="input" type="date" />
+                      </label>
+                      <label>
+                        <div class="mini">Tid</div>
+                        <input id="editEventTime" class="input" type="time" />
+                      </label>
+                      <label>
+                        <div class="mini">Sted</div>
+                        <input id="editEventLocation" class="input" type="text" />
+                      </label>
+                      <label>
+                        <div class="mini">Frist for afmelding (dage før)</div>
+                        <input id="editEventDeadlineDays" class="input" type="number" min="0" max="14" />
+                      </label>
+                      <div class="row">
+                        <button id="saveEventBtn" class="btn" type="button">Gem logeaften</button>
+                        <button id="deleteEventBtn" class="btn danger" type="button">Slet logeaften</button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </details>
+
+              <details class="admin-section">
+                <summary>Admin – medlemmer</summary>
+                <div class="admin-grid top-gap">
+                  <div class="panel-box">
+                    <div class="panel-content stack">
+                      <label>
+                        <div class="mini">Vælg broder</div>
+                        <select id="memberAdminSelect" class="select"></select>
+                      </label>
+                      <label>
+                        <div class="mini">Mail</div>
+                        <input id="memberEmailInput" class="input" type="email" placeholder="navn@eksempel.dk" />
+                      </label>
+                      <label>
+                        <div class="mini">Telefon</div>
+                        <input id="memberPhoneInput" class="input" type="text" placeholder="12 34 56 78" />
+                      </label>
+                      <label class="row">
+                        <input id="memberOptInOnlyInput" type="checkbox" />
+                        <span class="mini">Ikke automatisk tilmeldt</span>
+                      </label>
+                      <label>
+                        <div class="mini">Rolle</div>
+                        <select id="memberRoleInput" class="select">
+                          <option value="member">Broder</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </label>
+                      <button id="saveMemberBtn" class="btn" type="button">Gem medlem</button>
+                    </div>
+                  </div>
+                </div>
+              </details>
+
+              <details class="admin-section">
+                <summary>Admin – system og overblik</summary>
+                <div class="admin-grid top-gap">
+                  <div class="panel-box">
+                    <div class="panel-content stack">
+                      <button id="refreshBtn" class="btn secondary" type="button">Opdatér data</button>
+                      <button id="exportBtn" class="btn secondary" type="button">Eksportér data som JSON</button>
+                      <div class="mini">
+                        Denne version kræver, at du udfylder <code>supabase-config.js</code> og kører SQL-filerne i mappen <code>database</code> i Supabase først.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="panel-box">
+                    <div class="panel-content stack">
+                      <div class="mini">Mad til brødre: <strong id="mealsCount">0</strong></div>
+                      <div class="mini">Antal gæster: <strong id="guestCount">0</strong></div>
+                      <div class="mini">Mad til gæster: <strong id="guestMealsCount">0</strong></div>
+                      <div class="mini">Samlet antal kuverter: <strong id="totalMealsCount">0</strong></div>
+                    </div>
+                  </div>
+                </div>
+              </details>
+
             </div>
           </div>
 
