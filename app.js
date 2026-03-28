@@ -481,7 +481,7 @@ async function loadMyAttendanceIntoForm() {
 }
 
 function renderReminderPreview() {
-  if (!currentUser?.role === "admin") return;
+  if (!currentUser?.role !== "admin") return;
   if (!$("reminderPreview")) return;
 
   currentReminderEvent = getReminderCandidateEvent();
