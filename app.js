@@ -20,7 +20,7 @@ document.getElementById("loginBtn").onclick = async () => {
   const { data } = await supabase
     .from("members")
     .select("*")
-    .ilike("full_name", name)
+    .ilike("name", `%${name}%`)
     .single();
 
   if (!data) {
