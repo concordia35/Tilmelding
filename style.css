@@ -73,6 +73,7 @@ body {
 
 .login-box {
   min-width: 300px;
+  max-width: 380px;
   padding: 18px;
   background: rgba(255, 255, 255, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -124,7 +125,8 @@ body {
 
 .event-btn:hover {
   background: white;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(44, 37, 33, 0.06);
 }
 
 .event-btn.active {
@@ -144,6 +146,11 @@ body {
   color: var(--muted);
   font-size: 14px;
   line-height: 1.5;
+}
+
+#lastUpdated {
+  margin: -6px 0 18px;
+  padding: 0 4px;
 }
 
 .stats {
@@ -283,6 +290,13 @@ body {
   color: var(--text);
 }
 
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(111, 29, 42, 0.08);
+}
+
 .btn,
 .pill {
   border: 0;
@@ -308,6 +322,11 @@ body {
   background: transparent;
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.btn.danger {
+  background: #8f2f2f;
+  color: #fff;
 }
 
 .pill-off {
@@ -378,9 +397,61 @@ code {
   content: "–";
 }
 
-.btn.danger {
-  background: #8f2f2f;
-  color: #fff;
+/* Nye elementer */
+
+#quickActions {
+  position: sticky;
+  top: 14px;
+  z-index: 20;
+  margin-bottom: 18px;
+  padding: 12px;
+  background: rgba(255, 253, 249, 0.96);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(44, 37, 33, 0.08);
+  backdrop-filter: blur(6px);
+}
+
+#quickActions .btn {
+  flex: 1 1 220px;
+  justify-content: center;
+}
+
+#quickAttendBtn {
+  box-shadow: 0 6px 14px rgba(47, 90, 55, 0.12);
+}
+
+#quickAbsentBtn {
+  box-shadow: 0 6px 14px rgba(143, 47, 47, 0.12);
+}
+
+#reminderPreview {
+  background: #faf7f2;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  min-height: 110px;
+}
+
+#authLoggedOut .row .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#togglePasswordBtn {
+  flex: 0 0 auto;
+}
+
+#rememberLogin {
+  margin: 0;
+}
+
+#memberActionBox strong {
+  font-size: 16px;
+}
+
+.panel-box .row .btn.secondary {
+  flex: 1 1 auto;
 }
 
 @media (max-width: 1024px) {
@@ -390,10 +461,90 @@ code {
   .admin-grid {
     grid-template-columns: 1fr;
   }
+
+  .login-box {
+    width: 100%;
+    max-width: none;
+  }
 }
 
 @media (max-width: 920px) {
   .hero {
     padding: 26px;
+  }
+
+  .wrap {
+    padding: 18px;
+  }
+
+  .card-header {
+    padding: 18px 18px 10px;
+  }
+
+  .card-body {
+    padding: 0 18px 18px;
+  }
+}
+
+@media (max-width: 640px) {
+  .wrap {
+    padding: 14px;
+  }
+
+  .hero {
+    padding: 20px;
+    border-radius: 22px;
+  }
+
+  .hero-top {
+    gap: 16px;
+  }
+
+  .hero p {
+    font-size: 15px;
+  }
+
+  .login-box {
+    min-width: 100%;
+    padding: 14px;
+  }
+
+  .stats {
+    gap: 10px;
+  }
+
+  .stat {
+    padding: 14px;
+  }
+
+  .stat-value {
+    font-size: 24px;
+  }
+
+  #quickActions {
+    top: 8px;
+    padding: 10px;
+  }
+
+  #quickActions .btn {
+    width: 100%;
+  }
+
+  .row {
+    gap: 8px;
+  }
+
+  .input,
+  .select {
+    padding: 10px 11px;
+  }
+
+  .member,
+  .panel-content {
+    padding: 14px;
+  }
+
+  .event-btn {
+    padding: 14px;
   }
 }
