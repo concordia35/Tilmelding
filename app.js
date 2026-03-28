@@ -18,6 +18,7 @@ let settingsCache = {
   shared_password: "oddfellow35"
 };
 let adminVisible = false;
+let currentReminderEvent = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -98,10 +99,21 @@ function formatDeadline(event) {
   );
 }
 
-function isBeforeDeadline(event) {
+function getDeadlineDate(event) {
   const date = new Date(`${event.date}T${event.time || "19:00"}:00`);
   date.setDate(date.getDate() - (Number(event.deadline_days) || 0));
-  return new Date() <= date;
+  return date;
+}
+
+function isBeforeDeadline(event) {
+  return new Date() <= getDeadlineDate(event);
+}
+
+function daysUntilDate(date) {
+  const now = new Date();
+  const startOfNow = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfTarget = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.round((startOfTarget - startOfNow) / 86400000);
 }
 
 function getEventAbsences(eventId) {
@@ -136,6 +148,126 @@ function getCurrentAttendanceForUser() {
   return getAttendanceRecord(currentUser.id, currentEvent.id);
 }
 
+function getReminderCandidateEvent() {
+  const reminderDays = Number(settingsCache.reminder_days ?? 2);
+
+  const upcoming = eventsCache
+    .filter((event) => {
+      const eventDate = new Date(`${event.date}T${event.time || "19:00"}:00`);
+      return eventDate >= new Date();
+    })
+    .sort((a, b) => {
+      const aDate = new Date(`${a.date}T${a.time || "19:00"}:00`);
+      const bDate = new Date(`${b.date}T${b.time || "19:00"}:00`);
+      return aDate - bDate;
+    });
+
+  const exactMatch = upcoming.find((event) => {
+    const eventDate = new Date(`${event.date}T${event.time || "19:00"}:00`);
+    return daysUntilDate(eventDate) === reminderDays;
+  });
+
+  if (exactMatch) return exactMatch;
+
+  const nearMatch = upcoming.find((event) => {
+    const eventDate = new Date(`${event.date}T${event.time || "19:00"}:00`);
+    const daysUntilEvent = daysUntilDate(eventDate);
+    return daysUntilEvent >= 0 && daysUntilEvent <= reminderDays && isBeforeDeadline(event);
+  });
+
+  return nearMatch || null;
+}
+
+function buildReminderData(event) {
+  if (!event) {
+    return {
+      event: null,
+      attendingMembers: [],
+      absentMembers: [],
+      emails: [],
+      phones: [],
+      csv: "",
+      text: ""
+    };
+  }
+
+  const attendingMembers = getAttendingMembers(event.id);
+  const absentMembers = getAbsentMembers(event.id);
+
+  const emails = attendingMembers
+    .map((m) => m.email?.trim())
+    .filter(Boolean);
+
+  const phones = attendingMembers
+    .map((m) => m.phone?.trim())
+    .filter(Boolean);
+
+  const text =
+    `Påmindelse om ${event.title}\n` +
+    `${formatDate(event.date)} kl. ${event.time || "19:00"}\n` +
+    `${event.location || ""}\n` +
+    `Afmeldingsfrist: ${formatDeadline(event)}\n\n` +
+    `Du kan opdatere din status på logeaften-siden.`;
+
+  const header = "Navn,Mail,Telefon,Deltager,Mad,Gæst,Gæst med mad\n";
+  const rows = membersCache.map((member) => {
+    const record = getAttendanceRecord(member.id, event.id);
+    const attending = !isAbsent(member.id, event.id);
+    const wantsFood = attending
+      ? (record ? record.wants_food === true : !member.opt_in_only)
+      : false;
+    const bringsGuest = attending && record?.brings_guest === true;
+    const guestFood = attending && record?.guest_wants_food === true;
+
+    return [
+      csvEscape(member.name || ""),
+      csvEscape(member.email || ""),
+      csvEscape(member.phone || ""),
+      attending ? "Ja" : "Nej",
+      wantsFood ? "Ja" : "Nej",
+      bringsGuest ? csvEscape(record?.guest_name || "Ja") : "",
+      guestFood ? "Ja" : "Nej"
+    ].join(",");
+  });
+
+  return {
+    event,
+    attendingMembers,
+    absentMembers,
+    emails,
+    phones,
+    csv: header + rows.join("\n"),
+    text
+  };
+}
+
+function csvEscape(value) {
+  const stringValue = String(value ?? "");
+  if (stringValue.includes('"') || stringValue.includes(",") || stringValue.includes("\n")) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+  return stringValue;
+}
+
+function downloadFile(filename, content, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function copyToClipboard(text, successMessage) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showMessage(successMessage);
+  } catch {
+    showError("Kunne ikke kopiere til udklipsholder.");
+  }
+}
+
 function renderAuth() {
   const adminToggleBtn = $("adminToggleBtn");
   const adminPanel = $("adminPanel");
@@ -147,11 +279,14 @@ function renderAuth() {
       `${currentUser.name} · ${currentUser.role === "admin" ? "Admin" : "Broder"} · ${currentUser.email || ""}`;
     $("appArea").classList.remove("hidden");
     $("attendanceForm").classList.remove("hidden");
+    $("lastUpdated").classList.remove("hidden");
   } else {
     $("authLoggedOut").classList.remove("hidden");
     $("authLoggedIn").classList.add("hidden");
     $("appArea").classList.add("hidden");
     $("attendanceForm").classList.add("hidden");
+    $("lastUpdated").classList.add("hidden");
+    if ($("quickActions")) $("quickActions").classList.add("hidden");
     adminVisible = false;
   }
 
@@ -175,6 +310,12 @@ function renderEvents() {
     const absent = getAbsentMembers(event.id).length;
     const attending = membersCache.length - absent;
 
+    let myStatus = "";
+    if (currentUser) {
+      const isUserAbsent = isAbsent(currentUser.id, event.id);
+      myStatus = isUserAbsent ? "❌ Du deltager ikke" : "✅ Du deltager";
+    }
+
     const btn = document.createElement("button");
     btn.className =
       "event-btn" + (currentEvent && currentEvent.id === event.id ? " active" : "");
@@ -183,12 +324,14 @@ function renderEvents() {
       <div class="event-meta">${formatDate(event.date)} kl. ${event.time || "19:00"}</div>
       <div class="event-meta">Forventet fremmøde: ${attending}/${membersCache.length}</div>
       <div class="event-meta">Frist: ${formatDeadline(event)}</div>
+      ${myStatus ? `<div class="event-meta"><strong>${myStatus}</strong></div>` : ""}
     `;
 
     btn.addEventListener("click", async () => {
       currentEvent = event;
       renderAll();
       await loadMyAttendanceIntoForm();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
 
     $("eventList").appendChild(btn);
@@ -298,15 +441,20 @@ function renderMemberAction() {
   const absent = isAbsent(currentUser.id, currentEvent.id);
   const beforeDeadline = isBeforeDeadline(currentEvent);
   const boxClass = absent ? "warning" : "success-box";
+  const statusIcon = absent ? "❌" : "✅";
 
   $("memberActionBox").innerHTML = `
     <div class="${boxClass}">
-      <strong>${currentUser.name}</strong><br>
+      <strong>${statusIcon} ${currentUser.name}</strong><br>
       ${absent ? "Du står aktuelt som ikke deltagende." : "Du står aktuelt som deltagende."}
       ${currentUser.opt_in_only ? '<br><span class="mini">Denne broder er ikke automatisk tilmeldt som standard og skal selv melde sig til.</span>' : ""}
       ${!beforeDeadline ? '<br><span class="mini">Afmeldingsfristen er overskredet. Kun admin kan ændre efter fristen.</span>' : ""}
     </div>
   `;
+
+  if ($("quickActions")) {
+    $("quickActions").classList.remove("hidden");
+  }
 }
 
 async function loadMyAttendanceIntoForm() {
@@ -332,6 +480,27 @@ async function loadMyAttendanceIntoForm() {
   $("guestFields").classList.toggle("hidden", record.brings_guest !== true);
 }
 
+function renderReminderPreview() {
+  if (!currentUser?.role === "admin") return;
+  if (!$("reminderPreview")) return;
+
+  currentReminderEvent = getReminderCandidateEvent();
+  const reminderData = buildReminderData(currentReminderEvent);
+
+  if (!currentReminderEvent) {
+    $("reminderPreview").innerHTML = "Ingen påmindelser klar endnu.";
+    return;
+  }
+
+  $("reminderPreview").innerHTML = `
+    <strong>${currentReminderEvent.title}</strong><br>
+    ${formatDate(currentReminderEvent.date)} kl. ${currentReminderEvent.time || "19:00"}<br>
+    ${currentReminderEvent.location || ""}<br>
+    Frist: ${formatDeadline(currentReminderEvent)}<br><br>
+    Deltagere med kontaktinfo: ${reminderData.emails.length} mail / ${reminderData.phones.length} telefonnumre
+  `;
+}
+
 function renderAdmin() {
   const isAdmin = currentUser?.role === "admin";
   $("adminArea").classList.toggle("hidden", !isAdmin);
@@ -354,6 +523,7 @@ function renderAdmin() {
 
   fillEventEditForm();
   fillMemberEditForm();
+  renderReminderPreview();
 }
 
 function fillEventEditForm() {
@@ -430,6 +600,16 @@ async function loadAllData() {
     currentEvent = eventsCache[0];
   }
 
+  if (currentEvent) {
+    const refreshedCurrent = eventsCache.find((e) => e.id === currentEvent.id);
+    if (refreshedCurrent) currentEvent = refreshedCurrent;
+  }
+
+  if ($("lastUpdated")) {
+    $("lastUpdated").textContent =
+      "Opdateret: " + new Date().toLocaleTimeString("da-DK");
+  }
+
   console.log("Loaded members:", membersCache.length);
   console.log("Loaded events:", eventsCache.length);
   console.log("Loaded absences:", absencesCache.length);
@@ -493,7 +673,12 @@ async function performLogin(rawName, password, { silent = false } = {}) {
 
     currentUser = exactMatch;
     adminVisible = false;
-    saveLoginToBrowser(rawName.trim(), password);
+
+    if ($("rememberLogin")?.checked) {
+      saveLoginToBrowser(rawName.trim(), password);
+    } else {
+      clearSavedLogin();
+    }
 
     await loadAllData();
     renderAll();
@@ -512,6 +697,70 @@ async function performLogin(rawName, password, { silent = false } = {}) {
   }
 }
 
+async function quickSetAttendance(attending) {
+  if (!currentUser || !currentEvent) return;
+
+  if (!isBeforeDeadline(currentEvent) && currentUser.role !== "admin") {
+    showError("Afmeldingsfristen er overskredet.");
+    return;
+  }
+
+  const existingRecord = getCurrentAttendanceForUser();
+
+  const payload = {
+    member_id: currentUser.id,
+    event_id: currentEvent.id,
+    attending,
+    wants_food: attending ? (existingRecord?.wants_food ?? true) : false,
+    brings_guest: attending ? (existingRecord?.brings_guest ?? false) : false,
+    guest_name: attending ? (existingRecord?.guest_name ?? null) : null,
+    guest_wants_food: attending ? (existingRecord?.guest_wants_food ?? false) : false
+  };
+
+  const { error } = await supabase
+    .from("absences")
+    .upsert(payload, { onConflict: "event_id,member_id" });
+
+  if (error) {
+    console.error(error);
+    showError("Kunne ikke gemme.");
+    return;
+  }
+
+  await loadAllData();
+  renderAll();
+  await loadMyAttendanceIntoForm();
+  showMessage(attending ? "Du er nu markeret som deltagende." : "Du er nu markeret som ikke deltagende.");
+}
+
+function exportKitchenCsv() {
+  if (!currentEvent) {
+    showError("Vælg en logeaften først.");
+    return;
+  }
+
+  const header = "Navn,Deltager,Mad,Gæst,Gæst med mad\n";
+  const rows = membersCache.map((member) => {
+    const record = getAttendanceRecord(member.id, currentEvent.id);
+    const attending = !isAbsent(member.id, currentEvent.id);
+    const wantsFood = attending
+      ? (record ? record.wants_food === true : !member.opt_in_only)
+      : false;
+    const guest = attending && record?.brings_guest ? record?.guest_name || "Ja" : "";
+    const guestFood = attending && record?.guest_wants_food === true;
+
+    return [
+      csvEscape(member.name || ""),
+      attending ? "Ja" : "Nej",
+      wantsFood ? "Ja" : "Nej",
+      csvEscape(guest),
+      guestFood ? "Ja" : "Nej"
+    ].join(",");
+  });
+
+  downloadFile("koekkenliste.csv", header + rows.join("\n"), "text/csv;charset=utf-8;");
+}
+
 $("loginBtn").addEventListener("click", async () => {
   const rawName = $("loginFullName").value;
   const password = $("loginPassword").value;
@@ -522,9 +771,11 @@ $("logoutBtn").addEventListener("click", () => {
   currentUser = null;
   currentEvent = null;
   adminVisible = false;
+  currentReminderEvent = null;
   clearSavedLogin();
   $("loginFullName").value = "";
   $("loginPassword").value = "";
+  if ($("rememberLogin")) $("rememberLogin").checked = true;
   renderAll();
   showMessage("Du er logget ud.");
 });
@@ -535,12 +786,29 @@ $("adminToggleBtn").addEventListener("click", () => {
   renderAdmin();
 });
 
+$("togglePasswordBtn")?.addEventListener("click", () => {
+  const input = $("loginPassword");
+  if (!input) return;
+
+  const isPassword = input.type === "password";
+  input.type = isPassword ? "text" : "password";
+  $("togglePasswordBtn").textContent = isPassword ? "Skjul" : "Vis";
+});
+
 ["loginFullName", "loginPassword"].forEach((id) => {
   $(id).addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       $("loginBtn").click();
     }
   });
+});
+
+$("quickAttendBtn")?.addEventListener("click", async () => {
+  await quickSetAttendance(true);
+});
+
+$("quickAbsentBtn")?.addEventListener("click", async () => {
+  await quickSetAttendance(false);
 });
 
 $("bringsGuest").addEventListener("change", () => {
@@ -631,6 +899,8 @@ $("exportBtn")?.addEventListener("click", () => {
   a.click();
   URL.revokeObjectURL(url);
 });
+
+$("exportCsvBtn")?.addEventListener("click", exportKitchenCsv);
 
 $("eventAdminSelect")?.addEventListener("change", fillEventEditForm);
 $("memberAdminSelect")?.addEventListener("change", fillMemberEditForm);
@@ -764,6 +1034,59 @@ $("saveReminderBtn")?.addEventListener("click", async () => {
   showMessage("Indstillinger gemt.");
 });
 
+$("copyReminderBtn")?.addEventListener("click", async () => {
+  const reminderData = buildReminderData(currentReminderEvent);
+  if (!reminderData.event) {
+    showError("Ingen reminder klar.");
+    return;
+  }
+  await copyToClipboard(reminderData.text, "Remindertekst kopieret.");
+});
+
+$("openReminderMailBtn")?.addEventListener("click", () => {
+  const reminderData = buildReminderData(currentReminderEvent);
+  if (!reminderData.event) {
+    showError("Ingen reminder klar.");
+    return;
+  }
+
+  const subject = encodeURIComponent(`Påmindelse: ${reminderData.event.title}`);
+  const body = encodeURIComponent(reminderData.text);
+  const recipients = reminderData.emails.join(",");
+
+  window.location.href = `mailto:${recipients}?subject=${subject}&body=${body}`;
+});
+
+$("copyPhonesBtn")?.addEventListener("click", async () => {
+  const reminderData = buildReminderData(currentReminderEvent);
+  if (!reminderData.event) {
+    showError("Ingen reminder klar.");
+    return;
+  }
+  await copyToClipboard(reminderData.phones.join(", "), "Telefonliste kopieret.");
+});
+
+$("exportReminderCsvBtn")?.addEventListener("click", () => {
+  const reminderData = buildReminderData(currentReminderEvent);
+  if (!reminderData.event) {
+    showError("Ingen reminder klar.");
+    return;
+  }
+  downloadFile("reminder-modtagere.csv", reminderData.csv, "text/csv;charset=utf-8;");
+});
+
+setInterval(async () => {
+  if (currentUser) {
+    try {
+      await loadAllData();
+      renderAll();
+      await loadMyAttendanceIntoForm();
+    } catch (err) {
+      console.error("Auto refresh fejl:", err);
+    }
+  }
+}, 30000);
+
 (async function init() {
   try {
     await loadAllData();
@@ -773,6 +1096,7 @@ $("saveReminderBtn")?.addEventListener("click", async () => {
     if (savedLogin?.name && savedLogin?.password) {
       $("loginFullName").value = savedLogin.name;
       $("loginPassword").value = savedLogin.password;
+      if ($("rememberLogin")) $("rememberLogin").checked = true;
       await performLogin(savedLogin.name, savedLogin.password, { silent: true });
     }
   } catch (err) {
