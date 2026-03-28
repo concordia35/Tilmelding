@@ -297,9 +297,10 @@ function renderMemberAction() {
 
   const absent = isAbsent(currentUser.id, currentEvent.id);
   const beforeDeadline = isBeforeDeadline(currentEvent);
+  const boxClass = absent ? "warning" : "success-box";
 
   $("memberActionBox").innerHTML = `
-    <div class="success-box">
+    <div class="${boxClass}">
       <strong>${currentUser.name}</strong><br>
       ${absent ? "Du står aktuelt som ikke deltagende." : "Du står aktuelt som deltagende."}
       ${currentUser.opt_in_only ? '<br><span class="mini">Denne broder er ikke automatisk tilmeldt som standard og skal selv melde sig til.</span>' : ""}
