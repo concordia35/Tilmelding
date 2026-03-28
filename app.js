@@ -15,6 +15,7 @@ let settingsCache = {
   reminder_channel: "mail",
   shared_password: "oddfellow35"
 };
+let adminVisible = false;
 
 const $ = (id) => document.getElementById(id);
 
@@ -81,16 +82,19 @@ function getEventAbsences(eventId) {
   return absencesCache.filter((a) => a.event_id === eventId);
 }
 
-function isAbsent(memberId, eventId) {
-  return getEventAbsences(eventId).some(
-    (a) => a.member_id === memberId && a.attending === false
-  );
+function getAttendanceRecord(memberId, eventId) {
+  return getEventAbsences(eventId).find((a) => a.member_id === memberId) || null;
 }
 
-function getAttendanceRecord(memberId, eventId) {
-  return (
-    getEventAbsences(eventId).find((a) => a.member_id === memberId) || null
-  );
+function isAbsent(memberId, eventId) {
+  const member = membersCache.find((m) => m.id === memberId);
+  const record = getAttendanceRecord(memberId, eventId);
+
+  if (record) {
+    return record.attending === false;
+  }
+
+  return !!member?.opt_in_only;
 }
 
 function getAttendingMembers(eventId) {
@@ -107,6 +111,9 @@ function getCurrentAttendanceForUser() {
 }
 
 function renderAuth() {
+  const adminToggleBtn = $("adminToggleBtn");
+  const adminPanel = $("adminPanel");
+
   if (currentUser) {
     $("authLoggedOut").classList.add("hidden");
     $("authLoggedIn").classList.remove("hidden");
@@ -119,6 +126,15 @@ function renderAuth() {
     $("authLoggedIn").classList.add("hidden");
     $("appArea").classList.add("hidden");
     $("attendanceForm").classList.add("hidden");
+    adminVisible = false;
+  }
+
+  if (currentUser?.role === "admin") {
+    adminToggleBtn.classList.remove("hidden");
+  } else {
+    adminToggleBtn.classList.add("hidden");
+    adminPanel.classList.add("hidden");
+    adminVisible = false;
   }
 }
 
@@ -142,11 +158,13 @@ function renderEvents() {
       <div class="event-meta">Forventet fremmøde: ${attending}/${membersCache.length}</div>
       <div class="event-meta">Frist: ${formatDeadline(event)}</div>
     `;
+
     btn.addEventListener("click", async () => {
       currentEvent = event;
       renderAll();
       await loadMyAttendanceIntoForm();
     });
+
     $("eventList").appendChild(btn);
   });
 }
@@ -167,9 +185,11 @@ function renderStats() {
   const mealsCount = records.filter(
     (r) => r.attending !== false && r.wants_food === true
   ).length;
+
   const guestCount = records.filter(
     (r) => r.attending !== false && r.brings_guest === true
   ).length;
+
   const guestMealsCount = records.filter(
     (r) =>
       r.attending !== false &&
@@ -187,6 +207,7 @@ function renderStats() {
 
 function renderEventInfo() {
   if (!currentEvent) return;
+
   $("eventInfo").innerHTML = `
     <div style="font-size: 24px; font-weight: 800; margin-bottom: 6px;">${currentEvent.title}</div>
     <div class="muted">${formatDate(currentEvent.date)} kl. ${currentEvent.time || "19:00"} · ${currentEvent.location || ""}</div>
@@ -222,16 +243,22 @@ function renderMembers() {
   });
 
   if (absent.length === 0) {
-    $("absentList").innerHTML =
-      `<div class="empty">Ingen har meldt fra endnu.</div>`;
+    $("absentList").innerHTML = `<div class="empty">Ingen har meldt fra endnu.</div>`;
   } else {
     absent.forEach((member) => {
+      const record = getAttendanceRecord(member.id, currentEvent.id);
+
+      let statusText = "Har meldt fra";
+      if (!record && member.opt_in_only) {
+        statusText = "Ikke automatisk tilmeldt";
+      }
+
       const item = document.createElement("div");
       item.className = "member";
       item.innerHTML = `
         <div>
           <div class="member-name">${member.name}</div>
-          <div class="muted">${member.opt_in_only ? "Ikke automatisk tilmeldt" : "Har meldt fra"}</div>
+          <div class="muted">${statusText}</div>
         </div>
       `;
       $("absentList").appendChild(item);
@@ -243,14 +270,14 @@ function renderMemberAction() {
   if (!currentUser || !currentEvent) return;
 
   const record = getCurrentAttendanceForUser();
-  const absent = record ? record.attending === false : !!currentUser.opt_in_only;
+  const absent = isAbsent(currentUser.id, currentEvent.id);
   const beforeDeadline = isBeforeDeadline(currentEvent);
 
   $("memberActionBox").innerHTML = `
     <div class="success-box">
       <strong>${currentUser.name}</strong><br>
       ${absent ? "Du står aktuelt som ikke deltagende." : "Du står aktuelt som deltagende."}
-      ${currentUser.opt_in_only ? '<br><span class="mini">Denne broder er ikke automatisk tilmeldt som standard.</span>' : ""}
+      ${currentUser.opt_in_only ? '<br><span class="mini">Denne broder er ikke automatisk tilmeldt som standard og skal selv melde sig til.</span>' : ""}
       ${!beforeDeadline ? '<br><span class="mini">Afmeldingsfristen er overskredet. Kun admin kan ændre efter fristen.</span>' : ""}
     </div>
   `;
@@ -263,7 +290,7 @@ async function loadMyAttendanceIntoForm() {
 
   if (!record) {
     $("attending").checked = !currentUser.opt_in_only;
-    $("wantsFood").checked = true;
+    $("wantsFood").checked = !currentUser.opt_in_only;
     $("bringsGuest").checked = false;
     $("guestName").value = "";
     $("guestWantsFood").checked = false;
@@ -282,6 +309,8 @@ async function loadMyAttendanceIntoForm() {
 function renderAdmin() {
   const isAdmin = currentUser?.role === "admin";
   $("adminArea").classList.toggle("hidden", !isAdmin);
+  $("adminPanel").classList.toggle("hidden", !isAdmin || !adminVisible);
+
   if (!isAdmin) return;
 
   $("reminderDaysInput").value = settingsCache.reminder_days ?? 2;
@@ -435,6 +464,8 @@ $("loginBtn").addEventListener("click", async () => {
     }
 
     currentUser = exactMatch;
+    adminVisible = false;
+
     await loadAllData();
     renderAll();
     await loadMyAttendanceIntoForm();
@@ -447,10 +478,18 @@ $("loginBtn").addEventListener("click", async () => {
 
 $("logoutBtn").addEventListener("click", () => {
   currentUser = null;
+  currentEvent = null;
+  adminVisible = false;
   $("loginFullName").value = "";
   $("loginPassword").value = "";
   renderAll();
   showMessage("Du er logget ud.");
+});
+
+$("adminToggleBtn").addEventListener("click", () => {
+  if (currentUser?.role !== "admin") return;
+  adminVisible = !adminVisible;
+  renderAdmin();
 });
 
 ["loginFullName", "loginPassword"].forEach((id) => {
@@ -463,6 +502,7 @@ $("logoutBtn").addEventListener("click", () => {
 
 $("bringsGuest").addEventListener("change", () => {
   $("guestFields").classList.toggle("hidden", !$("bringsGuest").checked);
+
   if (!$("bringsGuest").checked) {
     $("guestName").value = "";
     $("guestWantsFood").checked = false;
@@ -477,6 +517,7 @@ $("saveBtn").addEventListener("click", async () => {
     return;
   }
 
+  const attending = $("attending").checked;
   const bringsGuest = $("bringsGuest").checked;
   const guestName = $("guestName").value.trim();
 
@@ -488,11 +529,11 @@ $("saveBtn").addEventListener("click", async () => {
   const payload = {
     member_id: currentUser.id,
     event_id: currentEvent.id,
-    attending: $("attending").checked,
-    wants_food: $("wantsFood").checked,
-    brings_guest: bringsGuest,
-    guest_name: bringsGuest ? guestName : null,
-    guest_wants_food: bringsGuest ? $("guestWantsFood").checked : false
+    attending,
+    wants_food: attending ? $("wantsFood").checked : false,
+    brings_guest: attending ? bringsGuest : false,
+    guest_name: attending && bringsGuest ? guestName : null,
+    guest_wants_food: attending && bringsGuest ? $("guestWantsFood").checked : false
   };
 
   const { error } = await supabase
@@ -566,6 +607,7 @@ $("addEventBtn")?.addEventListener("click", async () => {
   }
 
   const { error } = await supabase.from("events").insert(payload);
+
   if (error) {
     console.error(error);
     showError("Kunne ikke oprette logeaften.");
@@ -585,6 +627,7 @@ $("addEventBtn")?.addEventListener("click", async () => {
 
 $("saveEventBtn")?.addEventListener("click", async () => {
   const id = Number($("eventAdminSelect").value);
+
   const payload = {
     title: $("editEventTitle").value.trim(),
     date: $("editEventDate").value,
@@ -593,7 +636,11 @@ $("saveEventBtn")?.addEventListener("click", async () => {
     deadline_days: Number($("editEventDeadlineDays").value || 2)
   };
 
-  const { error } = await supabase.from("events").update(payload).eq("id", id);
+  const { error } = await supabase
+    .from("events")
+    .update(payload)
+    .eq("id", id);
+
   if (error) {
     console.error(error);
     showError("Kunne ikke gemme logeaften.");
@@ -607,9 +654,14 @@ $("saveEventBtn")?.addEventListener("click", async () => {
 
 $("deleteEventBtn")?.addEventListener("click", async () => {
   const id = Number($("eventAdminSelect").value);
+
   if (!confirm("Vil du slette denne logeaften?")) return;
 
-  const { error } = await supabase.from("events").delete().eq("id", id);
+  const { error } = await supabase
+    .from("events")
+    .delete()
+    .eq("id", id);
+
   if (error) {
     console.error(error);
     showError("Kunne ikke slette logeaften.");
@@ -624,6 +676,7 @@ $("deleteEventBtn")?.addEventListener("click", async () => {
 
 $("saveMemberBtn")?.addEventListener("click", async () => {
   const id = Number($("memberAdminSelect").value);
+
   const payload = {
     email: $("memberEmailInput").value.trim(),
     phone: $("memberPhoneInput").value.trim(),
@@ -631,7 +684,11 @@ $("saveMemberBtn")?.addEventListener("click", async () => {
     role: $("memberRoleInput").value
   };
 
-  const { error } = await supabase.from("members").update(payload).eq("id", id);
+  const { error } = await supabase
+    .from("members")
+    .update(payload)
+    .eq("id", id);
+
   if (error) {
     console.error(error);
     showError("Kunne ikke gemme medlem.");
@@ -652,6 +709,7 @@ $("saveReminderBtn")?.addEventListener("click", async () => {
   };
 
   const { error } = await supabase.from("settings").upsert(payload);
+
   if (error) {
     console.error(error);
     showError("Kunne ikke gemme indstillinger.");
