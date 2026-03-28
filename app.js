@@ -5,6 +5,8 @@ const supabase = window.supabase.createClient(
   SUPABASE_ANON_KEY
 );
 
+const LOGIN_STORAGE_KEY = "loge_login_v1";
+
 let currentUser = null;
 let currentEvent = null;
 let membersCache = [];
@@ -28,6 +30,30 @@ function normalizeName(value) {
 
 function escapeLike(value) {
   return (value || "").replace(/[%_]/g, "").trim();
+}
+
+function saveLoginToBrowser(name, password) {
+  localStorage.setItem(
+    LOGIN_STORAGE_KEY,
+    JSON.stringify({
+      name,
+      password
+    })
+  );
+}
+
+function getSavedLogin() {
+  try {
+    const raw = localStorage.getItem(LOGIN_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function clearSavedLogin() {
+  localStorage.removeItem(LOGIN_STORAGE_KEY);
 }
 
 function showMessage(text) {
@@ -409,14 +435,12 @@ async function loadAllData() {
   console.log("Loaded settings:", settingsCache);
 }
 
-$("loginBtn").addEventListener("click", async () => {
-  const rawName = $("loginFullName").value;
-  const password = $("loginPassword").value;
+async function performLogin(rawName, password, { silent = false } = {}) {
   const normalizedInput = normalizeName(rawName);
 
   if (!normalizedInput) {
-    showError("Skriv dit fulde navn.");
-    return;
+    if (!silent) showError("Skriv dit fulde navn.");
+    return false;
   }
 
   try {
@@ -428,15 +452,16 @@ $("loginBtn").addEventListener("click", async () => {
 
     if (settingsError) {
       console.error("Settings fejl:", settingsError);
-      showError("Kunne ikke læse indstillinger.");
-      return;
+      if (!silent) showError("Kunne ikke læse indstillinger.");
+      return false;
     }
 
     const sharedPassword = settingsRow?.shared_password || "oddfellow35";
 
     if (password !== sharedPassword) {
-      showError("Forkert password.");
-      return;
+      clearSavedLogin();
+      if (!silent) showError("Forkert password.");
+      return false;
     }
 
     const { data: members, error: memberError } = await supabase
@@ -447,8 +472,8 @@ $("loginBtn").addEventListener("click", async () => {
 
     if (memberError) {
       console.error("Members fejl:", memberError);
-      showError("Kunne ikke læse medlemmer.");
-      return;
+      if (!silent) showError("Kunne ikke læse medlemmer.");
+      return false;
     }
 
     const exactMatch = (members || []).find(
@@ -458,27 +483,45 @@ $("loginBtn").addEventListener("click", async () => {
     if (!exactMatch) {
       console.log("Login input:", rawName);
       console.log("Matchende kandidater:", members);
-      showError("Navn ikke fundet. Skriv navnet præcist som i databasen.");
-      return;
+      clearSavedLogin();
+      if (!silent) {
+        showError("Navn ikke fundet. Skriv navnet præcist som i databasen.");
+      }
+      return false;
     }
 
     currentUser = exactMatch;
     adminVisible = false;
+    saveLoginToBrowser(rawName.trim(), password);
 
     await loadAllData();
     renderAll();
     await loadMyAttendanceIntoForm();
-    showMessage("Du er logget ind.");
+
+    if (!silent) {
+      showMessage("Du er logget ind.");
+    }
+
+    return true;
   } catch (err) {
     console.error("Login fejl:", err);
-    showError("Kunne ikke logge ind.");
+    clearSavedLogin();
+    if (!silent) showError("Kunne ikke logge ind.");
+    return false;
   }
+}
+
+$("loginBtn").addEventListener("click", async () => {
+  const rawName = $("loginFullName").value;
+  const password = $("loginPassword").value;
+  await performLogin(rawName, password);
 });
 
 $("logoutBtn").addEventListener("click", () => {
   currentUser = null;
   currentEvent = null;
   adminVisible = false;
+  clearSavedLogin();
   $("loginFullName").value = "";
   $("loginPassword").value = "";
   renderAll();
@@ -724,6 +767,13 @@ $("saveReminderBtn")?.addEventListener("click", async () => {
   try {
     await loadAllData();
     renderAll();
+
+    const savedLogin = getSavedLogin();
+    if (savedLogin?.name && savedLogin?.password) {
+      $("loginFullName").value = savedLogin.name;
+      $("loginPassword").value = savedLogin.password;
+      await performLogin(savedLogin.name, savedLogin.password, { silent: true });
+    }
   } catch (err) {
     console.error(err);
     $("setupNotice").textContent =
