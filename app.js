@@ -269,7 +269,6 @@ function renderMembers() {
 function renderMemberAction() {
   if (!currentUser || !currentEvent) return;
 
-  const record = getCurrentAttendanceForUser();
   const absent = isAbsent(currentUser.id, currentEvent.id);
   const beforeDeadline = isBeforeDeadline(currentEvent);
 
