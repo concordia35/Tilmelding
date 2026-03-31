@@ -451,7 +451,6 @@ function renderMemberAction() {
       ${!beforeDeadline ? '<br><span class="mini">Afmeldingsfristen er overskredet. Kun admin kan ændre efter fristen.</span>' : ""}
     </div>
   `;
-
   if ($("quickActions")) {
     $("quickActions").classList.remove("hidden");
   }
@@ -1106,3 +1105,15 @@ setInterval(async () => {
     $("setupNotice").classList.remove("hidden");
   }
 })();
+
+// PWA service worker
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
+    try {
+      await navigator.serviceWorker.register("/Tilmelding/sw.js");
+      console.log("Service worker registreret");
+    } catch (error) {
+      console.error("Service worker fejl:", error);
+    }
+  });
+}
