@@ -723,7 +723,7 @@ async function quickSetAttendance(attending) {
     member_id: currentUser.id,
     event_id: currentEvent.id,
     attending,
-    wants_food: attending ? (existingRecord?.wants_food ?? true) : false,
+    wants_food: attending ? true : false,
     brings_guest: attending ? (existingRecord?.brings_guest ?? false) : false,
     guest_name: attending ? (existingRecord?.guest_name ?? null) : null,
     guest_wants_food: attending ? (existingRecord?.guest_wants_food ?? false) : false
@@ -816,11 +816,23 @@ $("togglePasswordBtn")?.addEventListener("click", () => {
 });
 
 $("quickAttendBtn")?.addEventListener("click", async () => {
+  $("attending").checked = true;
+  $("wantsFood").checked = true;
   await quickSetAttendance(true);
 });
 
 $("quickAbsentBtn")?.addEventListener("click", async () => {
+  $("attending").checked = false;
+  $("wantsFood").checked = false;
   await quickSetAttendance(false);
+});
+
+$("attending").addEventListener("change", () => {
+  if ($("attending").checked) {
+    $("wantsFood").checked = true;
+  } else {
+    $("wantsFood").checked = false;
+  }
 });
 
 $("bringsGuest").addEventListener("change", () => {
