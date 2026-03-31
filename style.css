@@ -400,16 +400,8 @@ code {
 /* Nye elementer */
 
 #quickActions {
-  position: sticky;
-  top: 14px;
-  z-index: 20;
+  position: static;
   margin-bottom: 18px;
-  padding: 12px;
-  background: rgba(255, 253, 249, 0.96);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  box-shadow: 0 10px 24px rgba(44, 37, 33, 0.08);
-  backdrop-filter: blur(6px);
 }
 
 #quickActions .btn {
@@ -519,11 +511,6 @@ code {
 
   .stat-value {
     font-size: 24px;
-  }
-
-  #quickActions {
-    top: 8px;
-    padding: 10px;
   }
 
   #quickActions .btn {
