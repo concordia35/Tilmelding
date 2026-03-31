@@ -344,7 +344,13 @@ function renderEvents() {
       currentEvent = event;
       renderAll();
       await loadMyAttendanceIntoForm();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+
+      if (window.innerWidth <= 1024) {
+        const overviewCard = document.getElementById("overviewCard");
+        if (overviewCard) {
+          overviewCard.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
     });
 
     $("eventList").appendChild(btn);
