@@ -310,10 +310,23 @@ function renderEvents() {
     const absent = getAbsentMembers(event.id).length;
     const attending = membersCache.length - absent;
 
-    let myStatus = "";
+    let myStatusLine = "";
+
     if (currentUser) {
+      const record = getAttendanceRecord(currentUser.id, event.id);
       const isUserAbsent = isAbsent(currentUser.id, event.id);
-      myStatus = isUserAbsent ? "❌ Du deltager ikke" : "✅ Du deltager";
+
+      if (isUserAbsent) {
+        myStatusLine = "❌ Du deltager ikke";
+      } else {
+        const wantsFood = record
+          ? record.wants_food === true
+          : !currentUser.opt_in_only;
+
+        myStatusLine = wantsFood
+          ? "✅ Du deltager · 🍽️ Med mad"
+          : "✅ Du deltager · 🚫 Uden mad";
+      }
     }
 
     const btn = document.createElement("button");
@@ -324,7 +337,7 @@ function renderEvents() {
       <div class="event-meta">${formatDate(event.date)} kl. ${event.time || "19:00"}</div>
       <div class="event-meta">Forventet fremmøde: ${attending}/${membersCache.length}</div>
       <div class="event-meta">Frist: ${formatDeadline(event)}</div>
-      ${myStatus ? `<div class="event-meta"><strong>${myStatus}</strong></div>` : ""}
+      ${myStatusLine ? `<div class="event-meta"><strong>${myStatusLine}</strong></div>` : ""}
     `;
 
     btn.addEventListener("click", async () => {
