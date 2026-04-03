@@ -1,28 +1,5 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase-config.js";
 
-// Fjern gamle service workers og caches, så PWA-cache ikke ødelægger loginflow
-(async function removeOldServiceWorkersAndCaches() {
-  try {
-    if ("serviceWorker" in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      for (const reg of registrations) {
-        await reg.unregister();
-      }
-    }
-
-    if ("caches" in window) {
-      const cacheNames = await caches.keys();
-      for (const cacheName of cacheNames) {
-        await caches.delete(cacheName);
-      }
-    }
-
-    console.log("Gamle service workers og caches er fjernet.");
-  } catch (err) {
-    console.error("Kunne ikke rydde gamle service workers/caches:", err);
-  }
-})();
-
 const supabase = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
@@ -46,6 +23,7 @@ let settingsCache = {
 };
 let adminVisible = false;
 let currentReminderEvent = null;
+let authBusy = false;
 
 const $ = (id) => document.getElementById(id);
 
@@ -64,6 +42,13 @@ function showError(text) {
 function clearMessages() {
   $("globalMessage").classList.add("hidden");
   $("globalError").classList.add("hidden");
+}
+
+function setLoginBusy(isBusy) {
+  const btn = $("loginBtn");
+  if (!btn) return;
+  btn.disabled = isBusy;
+  btn.textContent = isBusy ? "Logger ind..." : "Log ind";
 }
 
 function formatDate(dateString) {
@@ -557,6 +542,22 @@ function renderAll() {
   renderAdmin();
 }
 
+function resetAppStateAfterLogout() {
+  currentUser = null;
+  currentEvent = null;
+  adminVisible = false;
+  currentReminderEvent = null;
+  membersCache = [];
+  eventsCache = [];
+  absencesCache = [];
+  settingsCache = {
+    reminder_days: 2,
+    reminder_channel: "mail"
+  };
+  $("loginPassword").value = "";
+  renderAll();
+}
+
 async function loadAllData() {
   clearMessages();
 
@@ -599,15 +600,7 @@ async function loadAllData() {
     "Opdateret: " + new Date().toLocaleTimeString("da-DK");
 }
 
-async function hydrateCurrentUser() {
-  const {
-    data: { session },
-    error: sessionError
-  } = await supabase.auth.getSession();
-
-  if (sessionError) throw sessionError;
-
-  const authUser = session?.user;
+async function hydrateCurrentUserFromAuthUser(authUser) {
   if (!authUser) {
     currentUser = null;
     return;
@@ -629,6 +622,28 @@ async function hydrateCurrentUser() {
   currentUser = member;
 }
 
+async function hydrateCurrentUser() {
+  const {
+    data: { session },
+    error: sessionError
+  } = await supabase.auth.getSession();
+
+  if (sessionError) throw sessionError;
+
+  await hydrateCurrentUserFromAuthUser(session?.user || null);
+}
+
+async function afterAuthenticated(authUser, showLoginMessage = false) {
+  await hydrateCurrentUserFromAuthUser(authUser);
+  await loadAllData();
+  renderAll();
+  await loadMyAttendanceIntoForm();
+  $("setupNotice").classList.add("hidden");
+  if (showLoginMessage) {
+    showMessage("Du er logget ind.");
+  }
+}
+
 async function performLogin(email, password) {
   if (!email?.trim()) {
     showError("Skriv din email.");
@@ -639,29 +654,23 @@ async function performLogin(email, password) {
     return false;
   }
 
+  if (authBusy) return false;
+  authBusy = true;
+  setLoginBusy(true);
+
   const { error } = await supabase.auth.signInWithPassword({
     email: email.trim(),
     password
   });
 
   if (error) {
+    authBusy = false;
+    setLoginBusy(false);
     showError("Forkert email eller password.");
     return false;
   }
 
-  try {
-    await hydrateCurrentUser();
-    await loadAllData();
-    renderAll();
-    await loadMyAttendanceIntoForm();
-    $("setupNotice").classList.add("hidden");
-    showMessage("Du er logget ind.");
-    return true;
-  } catch (err) {
-    console.error(err);
-    showError(err.message || "Kunne ikke hente din bruger.");
-    return false;
-  }
+  return true;
 }
 
 async function quickSetAttendance(attending) {
@@ -734,13 +743,7 @@ $("loginBtn").addEventListener("click", async () => {
 
 $("logoutBtn").addEventListener("click", async () => {
   await supabase.auth.signOut();
-  currentUser = null;
-  currentEvent = null;
-  adminVisible = false;
-  currentReminderEvent = null;
-  $("loginEmail").value = "";
-  $("loginPassword").value = "";
-  renderAll();
+  resetAppStateAfterLogout();
   showMessage("Du er logget ud.");
 });
 
@@ -1130,20 +1133,24 @@ setInterval(async () => {
   }
 })();
 
-supabase.auth.onAuthStateChange(async (_event, session) => {
+supabase.auth.onAuthStateChange(async (event, session) => {
   try {
-    if (!session?.user) {
-      currentUser = null;
-      renderAll();
+    if (event === "SIGNED_OUT" || !session?.user) {
+      authBusy = false;
+      setLoginBusy(false);
+      resetAppStateAfterLogout();
       return;
     }
 
-    await hydrateCurrentUser();
-    await loadAllData();
-    renderAll();
-    await loadMyAttendanceIntoForm();
-    $("setupNotice").classList.add("hidden");
+    if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+      await afterAuthenticated(session.user, event === "SIGNED_IN" && authBusy);
+      authBusy = false;
+      setLoginBusy(false);
+    }
   } catch (err) {
+    authBusy = false;
+    setLoginBusy(false);
     console.error(err);
+    showError(err.message || "Kunne ikke hente din bruger.");
   }
 });
