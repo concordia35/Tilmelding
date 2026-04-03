@@ -1,12 +1,27 @@
-// 🔥 FORCE REMOVE OLD SERVICE WORKERS
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    registrations.forEach((reg) => {
-      reg.unregister();
-    });
-  });
-} 
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase-config.js";
+
+// Fjern gamle service workers og caches, så PWA-cache ikke ødelægger loginflow
+(async function removeOldServiceWorkersAndCaches() {
+  try {
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const reg of registrations) {
+        await reg.unregister();
+      }
+    }
+
+    if ("caches" in window) {
+      const cacheNames = await caches.keys();
+      for (const cacheName of cacheNames) {
+        await caches.delete(cacheName);
+      }
+    }
+
+    console.log("Gamle service workers og caches er fjernet.");
+  } catch (err) {
+    console.error("Kunne ikke rydde gamle service workers/caches:", err);
+  }
+})();
 
 const supabase = window.supabase.createClient(
   SUPABASE_URL,
