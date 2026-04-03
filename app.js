@@ -1,3 +1,11 @@
+// 🔥 FORCE REMOVE OLD SERVICE WORKERS
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((reg) => {
+      reg.unregister();
+    });
+  });
+}
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase-config.js";
 
 const supabase = window.supabase.createClient(
