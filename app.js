@@ -633,17 +633,6 @@ async function hydrateCurrentUser() {
   await hydrateCurrentUserFromAuthUser(session?.user || null);
 }
 
-async function afterAuthenticated(authUser, showLoginMessage = false) {
-  await hydrateCurrentUserFromAuthUser(authUser);
-  await loadAllData();
-  renderAll();
-  await loadMyAttendanceIntoForm();
-  $("setupNotice").classList.add("hidden");
-  if (showLoginMessage) {
-    showMessage("Du er logget ind.");
-  }
-}
-
 async function performLogin(email, password) {
   if (!email?.trim()) {
     showError("Skriv din email.");
@@ -657,20 +646,34 @@ async function performLogin(email, password) {
   if (authBusy) return false;
   authBusy = true;
   setLoginBusy(true);
+  clearMessages();
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email: email.trim(),
-    password
-  });
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password
+    });
 
-  if (error) {
+    if (error) {
+      showError("Forkert email eller password.");
+      return false;
+    }
+
+    await hydrateCurrentUserFromAuthUser(data.user);
+    await loadAllData();
+    renderAll();
+    await loadMyAttendanceIntoForm();
+    $("setupNotice").classList.add("hidden");
+    showMessage("Du er logget ind.");
+    return true;
+  } catch (err) {
+    console.error(err);
+    showError(err.message || "Kunne ikke hente din bruger.");
+    return false;
+  } finally {
     authBusy = false;
     setLoginBusy(false);
-    showError("Forkert email eller password.");
-    return false;
   }
-
-  return true;
 }
 
 async function quickSetAttendance(attending) {
@@ -1130,27 +1133,21 @@ setInterval(async () => {
     $("setupNotice").textContent =
       msg || "Kunne ikke hente data fra Supabase. Tjek RLS policies, users og members.user_id.";
     $("setupNotice").classList.remove("hidden");
+  } finally {
+    authBusy = false;
+    setLoginBusy(false);
   }
 })();
 
 supabase.auth.onAuthStateChange(async (event, session) => {
   try {
     if (event === "SIGNED_OUT" || !session?.user) {
-      authBusy = false;
-      setLoginBusy(false);
       resetAppStateAfterLogout();
-      return;
-    }
-
-    if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
-      await afterAuthenticated(session.user, event === "SIGNED_IN" && authBusy);
-      authBusy = false;
-      setLoginBusy(false);
     }
   } catch (err) {
+    console.error(err);
+  } finally {
     authBusy = false;
     setLoginBusy(false);
-    console.error(err);
-    showError(err.message || "Kunne ikke hente din bruger.");
   }
 });
