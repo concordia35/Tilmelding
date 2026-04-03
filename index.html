@@ -6,7 +6,6 @@
   <title>Tilmelding til logeaftener</title>
   <link rel="stylesheet" href="style.css" />
 
-  <!-- PWA -->
   <link rel="manifest" href="/Tilmelding/manifest.webmanifest">
   <meta name="theme-color" content="#6f1d2a">
   <link rel="icon" href="/Tilmelding/icons/icon-192.png">
@@ -28,25 +27,22 @@
             <h3>Log ind</h3>
             <div class="stack">
               <label>
-                <div class="mini">Fulde navn</div>
-                <input id="loginFullName" class="input" type="text" placeholder="Fx Lars Møller Andersen" />
+                <div class="mini">Email</div>
+                <input id="loginEmail" class="input" type="email" placeholder="navn@eksempel.dk" autocomplete="username email" />
               </label>
               <label>
-                <div class="mini">Fælles adgangskode</div>
+                <div class="mini">Personligt password</div>
                 <div class="row">
-                  <input id="loginPassword" class="input" type="password" placeholder="••••••••" />
+                  <input id="loginPassword" class="input" type="password" placeholder="••••••••" autocomplete="current-password" />
                   <button id="togglePasswordBtn" class="btn secondary" type="button" aria-label="Vis eller skjul password">Vis</button>
                 </div>
               </label>
-              <label class="row">
-                <input id="rememberLogin" type="checkbox" checked />
-                <span class="mini">Husk login på denne enhed</span>
-              </label>
               <div class="row">
                 <button id="loginBtn" class="btn" type="button">Log ind</button>
+                <button id="forgotPasswordBtn" class="btn secondary" type="button">Glemt password</button>
               </div>
-              <div class="mini">
-                Indtast dit fulde navn og den fælles adgangskode for at åbne oversigten.
+              <div id="authHelperText" class="mini">
+                Log ind med din email og dit eget password.
               </div>
             </div>
           </div>
@@ -57,6 +53,21 @@
             <div class="row top-gap">
               <button id="adminToggleBtn" class="btn ghost hidden" type="button">Admin</button>
               <button id="logoutBtn" class="btn secondary" type="button">Log ud</button>
+            </div>
+          </div>
+
+          <div id="passwordResetBox" class="hidden top-gap reset-box">
+            <h3>Skift password</h3>
+            <div class="stack">
+              <label>
+                <div class="mini">Nyt password</div>
+                <input id="newPassword" class="input" type="password" minlength="10" autocomplete="new-password" />
+              </label>
+              <label>
+                <div class="mini">Gentag nyt password</div>
+                <input id="confirmPassword" class="input" type="password" minlength="10" autocomplete="new-password" />
+              </label>
+              <button id="changePasswordBtn" class="btn" type="button">Gem nyt password</button>
             </div>
           </div>
         </div>
@@ -187,10 +198,6 @@
                           <option value="sms">SMS</option>
                           <option value="begge">Mail + SMS</option>
                         </select>
-                      </label>
-                      <label>
-                        <div class="mini">Fælles adgangskode</div>
-                        <input id="sharedPasswordInput" class="input" type="text" placeholder="Fælles adgangskode" />
                       </label>
                       <button id="saveReminderBtn" class="btn" type="button">Gem indstillinger</button>
                     </div>
@@ -325,7 +332,7 @@
                       <button id="exportBtn" class="btn secondary" type="button">Eksportér data som JSON</button>
                       <button id="exportCsvBtn" class="btn secondary" type="button">Eksportér køkkenliste som CSV</button>
                       <div class="mini">
-                        Sørg for, at <code>supabase-config.js</code> er udfyldt, og at tabeller samt policies er oprettet korrekt i Supabase.
+                        Sørg for, at <code>supabase-config.js</code> er udfyldt, og at Auth, RLS og <code>members.user_id</code> er sat op korrekt i Supabase.
                       </div>
                     </div>
                   </div>
