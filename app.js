@@ -2,10 +2,15 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase-config.js";
 
 const supabase = window.supabase.createClient(
   SUPABASE_URL,
-  SUPABASE_ANON_KEY
+  SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  }
 );
-
-const LOGIN_STORAGE_KEY = "loge_login_v1";
 
 let currentUser = null;
 let currentEvent = null;
@@ -14,48 +19,12 @@ let eventsCache = [];
 let absencesCache = [];
 let settingsCache = {
   reminder_days: 2,
-  reminder_channel: "mail",
-  shared_password: "oddfellow35"
+  reminder_channel: "mail"
 };
 let adminVisible = false;
 let currentReminderEvent = null;
 
 const $ = (id) => document.getElementById(id);
-
-function normalizeName(value) {
-  return (value || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase();
-}
-
-function escapeLike(value) {
-  return (value || "").replace(/[%_]/g, "").trim();
-}
-
-function saveLoginToBrowser(name, password) {
-  localStorage.setItem(
-    LOGIN_STORAGE_KEY,
-    JSON.stringify({
-      name,
-      password
-    })
-  );
-}
-
-function getSavedLogin() {
-  try {
-    const raw = localStorage.getItem(LOGIN_STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-function clearSavedLogin() {
-  localStorage.removeItem(LOGIN_STORAGE_KEY);
-}
 
 function showMessage(text) {
   $("globalMessage").textContent = text;
@@ -66,7 +35,7 @@ function showMessage(text) {
 function showError(text) {
   $("globalError").textContent = text;
   $("globalError").classList.remove("hidden");
-  setTimeout(() => $("globalError").classList.add("hidden"), 4000);
+  setTimeout(() => $("globalError").classList.add("hidden"), 4500);
 }
 
 function clearMessages() {
@@ -114,6 +83,33 @@ function daysUntilDate(date) {
   const startOfNow = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfTarget = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   return Math.round((startOfTarget - startOfNow) / 86400000);
+}
+
+function csvEscape(value) {
+  const stringValue = String(value ?? "");
+  if (stringValue.includes('"') || stringValue.includes(",") || stringValue.includes("\n")) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+  return stringValue;
+}
+
+function downloadFile(filename, content, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function copyToClipboard(text, successMessage) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showMessage(successMessage);
+  } catch {
+    showError("Kunne ikke kopiere til udklipsholder.");
+  }
 }
 
 function getEventAbsences(eventId) {
@@ -169,13 +165,13 @@ function getReminderCandidateEvent() {
 
   if (exactMatch) return exactMatch;
 
-  const nearMatch = upcoming.find((event) => {
-    const eventDate = new Date(`${event.date}T${event.time || "19:00"}:00`);
-    const daysUntilEvent = daysUntilDate(eventDate);
-    return daysUntilEvent >= 0 && daysUntilEvent <= reminderDays && isBeforeDeadline(event);
-  });
-
-  return nearMatch || null;
+  return (
+    upcoming.find((event) => {
+      const eventDate = new Date(`${event.date}T${event.time || "19:00"}:00`);
+      const daysUntilEvent = daysUntilDate(eventDate);
+      return daysUntilEvent >= 0 && daysUntilEvent <= reminderDays && isBeforeDeadline(event);
+    }) || null
+  );
 }
 
 function buildReminderData(event) {
@@ -241,33 +237,6 @@ function buildReminderData(event) {
   };
 }
 
-function csvEscape(value) {
-  const stringValue = String(value ?? "");
-  if (stringValue.includes('"') || stringValue.includes(",") || stringValue.includes("\n")) {
-    return `"${stringValue.replace(/"/g, '""')}"`;
-  }
-  return stringValue;
-}
-
-function downloadFile(filename, content, mimeType) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-async function copyToClipboard(text, successMessage) {
-  try {
-    await navigator.clipboard.writeText(text);
-    showMessage(successMessage);
-  } catch {
-    showError("Kunne ikke kopiere til udklipsholder.");
-  }
-}
-
 function renderAuth() {
   const adminToggleBtn = $("adminToggleBtn");
   const adminPanel = $("adminPanel");
@@ -280,6 +249,7 @@ function renderAuth() {
     $("appArea").classList.remove("hidden");
     $("attendanceForm").classList.remove("hidden");
     $("lastUpdated").classList.remove("hidden");
+    $("authHelperText").textContent = "Du er logget ind med din personlige konto.";
   } else {
     $("authLoggedOut").classList.remove("hidden");
     $("authLoggedIn").classList.add("hidden");
@@ -288,6 +258,7 @@ function renderAuth() {
     $("lastUpdated").classList.add("hidden");
     if ($("quickActions")) $("quickActions").classList.add("hidden");
     adminVisible = false;
+    $("authHelperText").textContent = "Log ind med din email og dit eget password.";
   }
 
   if (currentUser?.role === "admin") {
@@ -319,10 +290,7 @@ function renderEvents() {
       if (isUserAbsent) {
         myStatusLine = "❌ Du deltager ikke";
       } else {
-        const wantsFood = record
-          ? record.wants_food === true
-          : !currentUser.opt_in_only;
-
+        const wantsFood = record ? record.wants_food === true : !currentUser.opt_in_only;
         myStatusLine = wantsFood
           ? "✅ Du deltager · 🍽️ Med mad"
           : "✅ Du deltager · 🚫 Uden mad";
@@ -385,12 +353,10 @@ function renderStats() {
       r.guest_wants_food === true
   ).length;
 
-  if ($("mealsCount")) $("mealsCount").textContent = mealsCount;
-  if ($("guestCount")) $("guestCount").textContent = guestCount;
-  if ($("guestMealsCount")) $("guestMealsCount").textContent = guestMealsCount;
-  if ($("totalMealsCount")) {
-    $("totalMealsCount").textContent = mealsCount + guestMealsCount;
-  }
+  $("mealsCount").textContent = mealsCount;
+  $("guestCount").textContent = guestCount;
+  $("guestMealsCount").textContent = guestMealsCount;
+  $("totalMealsCount").textContent = mealsCount + guestMealsCount;
 }
 
 function renderEventInfo() {
@@ -413,11 +379,8 @@ function renderMembers() {
 
   attending.forEach((member) => {
     const record = getAttendanceRecord(member.id, currentEvent.id);
-    const guestText = record?.brings_guest
-      ? ` · Gæst: ${record.guest_name || "Ja"}`
-      : "";
-    const foodText =
-      record?.wants_food === false ? " · Uden mad" : " · Med mad";
+    const guestText = record?.brings_guest ? ` · Gæst: ${record.guest_name || "Ja"}` : "";
+    const foodText = record?.wants_food === false ? " · Uden mad" : " · Med mad";
 
     const item = document.createElement("div");
     item.className = "member";
@@ -470,9 +433,7 @@ function renderMemberAction() {
       ${!beforeDeadline ? '<br><span class="mini">Afmeldingsfristen er overskredet. Kun admin kan ændre efter fristen.</span>' : ""}
     </div>
   `;
-  if ($("quickActions")) {
-    $("quickActions").classList.remove("hidden");
-  }
+  $("quickActions").classList.remove("hidden");
 }
 
 async function loadMyAttendanceIntoForm() {
@@ -499,9 +460,7 @@ async function loadMyAttendanceIntoForm() {
 }
 
 function renderReminderPreview() {
-  if (!currentUser?.role !== "admin") return;
-  if (!$("reminderPreview")) return;
-
+  if (!currentUser || currentUser.role !== "admin") return;
   currentReminderEvent = getReminderCandidateEvent();
   const reminderData = buildReminderData(currentReminderEvent);
 
@@ -528,8 +487,6 @@ function renderAdmin() {
 
   $("reminderDaysInput").value = settingsCache.reminder_days ?? 2;
   $("reminderChannelInput").value = settingsCache.reminder_channel ?? "mail";
-  $("sharedPasswordInput").value =
-    settingsCache.shared_password ?? "oddfellow35";
 
   $("eventAdminSelect").innerHTML = eventsCache
     .map((e) => `<option value="${e.id}">${e.title}</option>`)
@@ -580,39 +537,31 @@ function renderAll() {
 async function loadAllData() {
   clearMessages();
 
+  const settingsPromise = currentUser?.role === "admin"
+    ? supabase.from("settings").select("*").limit(1).maybeSingle()
+    : Promise.resolve({ data: null, error: null });
+
   const [
     { data: members, error: membersError },
     { data: events, error: eventsError },
     { data: absences, error: absencesError },
     { data: settings, error: settingsError }
   ] = await Promise.all([
-    supabase.from("members").select("*").order("name"),
+    supabase.from("members_public").select("*").order("name"),
     supabase.from("events").select("*").order("date"),
     supabase.from("absences").select("*"),
-    supabase.from("settings").select("*").limit(1).maybeSingle()
+    settingsPromise
   ]);
 
-  if (membersError) {
-    console.error("membersError:", membersError);
-    throw membersError;
-  }
-  if (eventsError) {
-    console.error("eventsError:", eventsError);
-    throw eventsError;
-  }
-  if (absencesError) {
-    console.error("absencesError:", absencesError);
-    throw absencesError;
-  }
-  if (settingsError) {
-    console.error("settingsError:", settingsError);
-    throw settingsError;
-  }
+  if (membersError) throw membersError;
+  if (eventsError) throw eventsError;
+  if (absencesError) throw absencesError;
+  if (settingsError) throw settingsError;
 
   membersCache = members || [];
   eventsCache = events || [];
   absencesCache = absences || [];
-  settingsCache = settings || settingsCache;
+  if (settings) settingsCache = settings;
 
   if (!currentEvent && eventsCache.length > 0) {
     currentEvent = eventsCache[0];
@@ -623,94 +572,67 @@ async function loadAllData() {
     if (refreshedCurrent) currentEvent = refreshedCurrent;
   }
 
-  if ($("lastUpdated")) {
-    $("lastUpdated").textContent =
-      "Opdateret: " + new Date().toLocaleTimeString("da-DK");
-  }
-
-  console.log("Loaded members:", membersCache.length);
-  console.log("Loaded events:", eventsCache.length);
-  console.log("Loaded absences:", absencesCache.length);
-  console.log("Loaded settings:", settingsCache);
+  $("lastUpdated").textContent =
+    "Opdateret: " + new Date().toLocaleTimeString("da-DK");
 }
 
-async function performLogin(rawName, password, { silent = false } = {}) {
-  const normalizedInput = normalizeName(rawName);
+async function hydrateCurrentUser() {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
 
-  if (!normalizedInput) {
-    if (!silent) showError("Skriv dit fulde navn.");
+  const authUser = authData?.user;
+  if (!authUser) {
+    currentUser = null;
+    return;
+  }
+
+  const { data: member, error: memberError } = await supabase
+    .from("members")
+    .select("*")
+    .eq("user_id", authUser.id)
+    .maybeSingle();
+
+  if (memberError) throw memberError;
+
+  if (!member) {
+    await supabase.auth.signOut();
+    currentUser = null;
+    throw new Error("Din bruger er ikke koblet til et medlem i databasen endnu.");
+  }
+
+  currentUser = member;
+}
+
+async function performLogin(email, password) {
+  if (!email?.trim()) {
+    showError("Skriv din email.");
+    return false;
+  }
+  if (!password?.trim()) {
+    showError("Skriv dit password.");
+    return false;
+  }
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email: email.trim(),
+    password
+  });
+
+  if (error) {
+    showError("Forkert email eller password.");
     return false;
   }
 
   try {
-    const { data: settingsRow, error: settingsError } = await supabase
-      .from("settings")
-      .select("shared_password")
-      .limit(1)
-      .maybeSingle();
-
-    if (settingsError) {
-      console.error("Settings fejl:", settingsError);
-      if (!silent) showError("Kunne ikke læse indstillinger.");
-      return false;
-    }
-
-    const sharedPassword = settingsRow?.shared_password || "oddfellow35";
-
-    if (password !== sharedPassword) {
-      clearSavedLogin();
-      if (!silent) showError("Forkert password.");
-      return false;
-    }
-
-    const { data: members, error: memberError } = await supabase
-      .from("members")
-      .select("*")
-      .ilike("name", `%${escapeLike(rawName)}%`)
-      .limit(20);
-
-    if (memberError) {
-      console.error("Members fejl:", memberError);
-      if (!silent) showError("Kunne ikke læse medlemmer.");
-      return false;
-    }
-
-    const exactMatch = (members || []).find(
-      (m) => normalizeName(m.name) === normalizedInput
-    );
-
-    if (!exactMatch) {
-      console.log("Login input:", rawName);
-      console.log("Matchende kandidater:", members);
-      clearSavedLogin();
-      if (!silent) {
-        showError("Navn ikke fundet. Skriv navnet præcist som i databasen.");
-      }
-      return false;
-    }
-
-    currentUser = exactMatch;
-    adminVisible = false;
-
-    if ($("rememberLogin")?.checked) {
-      saveLoginToBrowser(rawName.trim(), password);
-    } else {
-      clearSavedLogin();
-    }
-
+    await hydrateCurrentUser();
     await loadAllData();
     renderAll();
     await loadMyAttendanceIntoForm();
-
-    if (!silent) {
-      showMessage("Du er logget ind.");
-    }
-
+    showMessage("Du er logget ind.");
     return true;
   } catch (err) {
-    console.error("Login fejl:", err);
-    clearSavedLogin();
-    if (!silent) showError("Kunne ikke logge ind.");
+    console.error(err);
+    showError(err.message || "Kunne ikke hente din bruger.");
     return false;
   }
 }
@@ -780,20 +702,17 @@ function exportKitchenCsv() {
 }
 
 $("loginBtn").addEventListener("click", async () => {
-  const rawName = $("loginFullName").value;
-  const password = $("loginPassword").value;
-  await performLogin(rawName, password);
+  await performLogin($("loginEmail").value, $("loginPassword").value);
 });
 
-$("logoutBtn").addEventListener("click", () => {
+$("logoutBtn").addEventListener("click", async () => {
+  await supabase.auth.signOut();
   currentUser = null;
   currentEvent = null;
   adminVisible = false;
   currentReminderEvent = null;
-  clearSavedLogin();
-  $("loginFullName").value = "";
+  $("loginEmail").value = "";
   $("loginPassword").value = "";
-  if ($("rememberLogin")) $("rememberLogin").checked = true;
   renderAll();
   showMessage("Du er logget ud.");
 });
@@ -806,19 +725,61 @@ $("adminToggleBtn").addEventListener("click", () => {
 
 $("togglePasswordBtn")?.addEventListener("click", () => {
   const input = $("loginPassword");
-  if (!input) return;
-
   const isPassword = input.type === "password";
   input.type = isPassword ? "text" : "password";
   $("togglePasswordBtn").textContent = isPassword ? "Skjul" : "Vis";
 });
 
-["loginFullName", "loginPassword"].forEach((id) => {
+["loginEmail", "loginPassword"].forEach((id) => {
   $(id).addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      $("loginBtn").click();
-    }
+    if (e.key === "Enter") $("loginBtn").click();
   });
+});
+
+$("forgotPasswordBtn")?.addEventListener("click", async () => {
+  const email = $("loginEmail").value.trim();
+  if (!email) {
+    showError("Skriv din email først.");
+    return;
+  }
+
+  const redirectTo = `${window.location.origin}${window.location.pathname}`;
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+
+  if (error) {
+    console.error(error);
+    showError("Kunne ikke sende nulstillingsmail.");
+    return;
+  }
+
+  showMessage("Nulstillingsmail er sendt.");
+});
+
+$("changePasswordBtn")?.addEventListener("click", async () => {
+  const newPassword = $("newPassword").value;
+  const confirmPassword = $("confirmPassword").value;
+
+  if (!newPassword || newPassword.length < 10) {
+    showError("Det nye password skal være mindst 10 tegn.");
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    showError("De to passwords er ikke ens.");
+    return;
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+  if (error) {
+    console.error(error);
+    showError("Kunne ikke opdatere password.");
+    return;
+  }
+
+  $("newPassword").value = "";
+  $("confirmPassword").value = "";
+  showMessage("Dit password er opdateret.");
 });
 
 $("quickAttendBtn")?.addEventListener("click", async () => {
@@ -834,11 +795,7 @@ $("quickAbsentBtn")?.addEventListener("click", async () => {
 });
 
 $("attending").addEventListener("change", () => {
-  if ($("attending").checked) {
-    $("wantsFood").checked = true;
-  } else {
-    $("wantsFood").checked = false;
-  }
+  $("wantsFood").checked = $("attending").checked;
 });
 
 $("bringsGuest").addEventListener("change", () => {
@@ -1047,8 +1004,7 @@ $("saveReminderBtn")?.addEventListener("click", async () => {
   const payload = {
     id: settingsCache.id || 1,
     reminder_days: Number($("reminderDaysInput").value || 2),
-    reminder_channel: $("reminderChannelInput").value,
-    shared_password: $("sharedPasswordInput").value.trim() || "oddfellow35"
+    reminder_channel: $("reminderChannelInput").value
   };
 
   const { error } = await supabase.from("settings").upsert(payload);
@@ -1119,25 +1075,44 @@ setInterval(async () => {
 
 (async function init() {
   try {
+    const hash = window.location.hash || "";
+    const isRecoveryFlow = hash.includes("type=recovery") || hash.includes("access_token=");
+    if (isRecoveryFlow) {
+      $("passwordResetBox").classList.remove("hidden");
+      $("authHelperText").textContent = "Vælg et nyt password for din konto.";
+    }
+
+    await hydrateCurrentUser();
     await loadAllData();
     renderAll();
-
-    const savedLogin = getSavedLogin();
-    if (savedLogin?.name && savedLogin?.password) {
-      $("loginFullName").value = savedLogin.name;
-      $("loginPassword").value = savedLogin.password;
-      if ($("rememberLogin")) $("rememberLogin").checked = true;
-      await performLogin(savedLogin.name, savedLogin.password, { silent: true });
+    if (currentUser) {
+      await loadMyAttendanceIntoForm();
     }
   } catch (err) {
     console.error(err);
     $("setupNotice").textContent =
-      "Kunne ikke hente data fra Supabase. Tjek supabase-config.js, RLS policies og at tabellerne indeholder data.";
+      err.message || "Kunne ikke hente data fra Supabase. Tjek RLS policies, users og members.user_id.";
     $("setupNotice").classList.remove("hidden");
   }
 })();
 
-// PWA service worker
+supabase.auth.onAuthStateChange(async (_event, session) => {
+  try {
+    if (!session?.user) {
+      currentUser = null;
+      renderAll();
+      return;
+    }
+
+    await hydrateCurrentUser();
+    await loadAllData();
+    renderAll();
+    await loadMyAttendanceIntoForm();
+  } catch (err) {
+    console.error(err);
+  }
+});
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
