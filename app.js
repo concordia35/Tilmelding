@@ -1124,14 +1124,3 @@ supabase.auth.onAuthStateChange(async (_event, session) => {
     console.error(err);
   }
 });
-
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", async () => {
-    try {
-      await navigator.serviceWorker.register("/Tilmelding/sw.js");
-      console.log("Service worker registreret");
-    } catch (error) {
-      console.error("Service worker fejl:", error);
-    }
-  });
-}
