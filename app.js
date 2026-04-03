@@ -5,7 +5,7 @@ if ("serviceWorker" in navigator) {
       reg.unregister();
     });
   });
-}
+} 
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase-config.js";
 
 const supabase = window.supabase.createClient(
