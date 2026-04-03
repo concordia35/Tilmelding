@@ -577,10 +577,14 @@ async function loadAllData() {
 }
 
 async function hydrateCurrentUser() {
-  const { data: authData, error: authError } = await supabase.auth.getUser();
-  if (authError) throw authError;
+  const {
+    data: { session },
+    error: sessionError
+  } = await supabase.auth.getSession();
 
-  const authUser = authData?.user;
+  if (sessionError) throw sessionError;
+
+  const authUser = session?.user;
   if (!authUser) {
     currentUser = null;
     return;
@@ -595,7 +599,6 @@ async function hydrateCurrentUser() {
   if (memberError) throw memberError;
 
   if (!member) {
-    await supabase.auth.signOut();
     currentUser = null;
     throw new Error("Din bruger er ikke koblet til et medlem i databasen endnu.");
   }
@@ -628,6 +631,7 @@ async function performLogin(email, password) {
     await loadAllData();
     renderAll();
     await loadMyAttendanceIntoForm();
+    $("setupNotice").classList.add("hidden");
     showMessage("Du er logget ind.");
     return true;
   } catch (err) {
@@ -1090,8 +1094,15 @@ setInterval(async () => {
     }
   } catch (err) {
     console.error(err);
+
+    const msg = err?.message || "";
+    if (msg.includes("Auth session missing") || msg.includes("session missing")) {
+      renderAll();
+      return;
+    }
+
     $("setupNotice").textContent =
-      err.message || "Kunne ikke hente data fra Supabase. Tjek RLS policies, users og members.user_id.";
+      msg || "Kunne ikke hente data fra Supabase. Tjek RLS policies, users og members.user_id.";
     $("setupNotice").classList.remove("hidden");
   }
 })();
@@ -1108,6 +1119,7 @@ supabase.auth.onAuthStateChange(async (_event, session) => {
     await loadAllData();
     renderAll();
     await loadMyAttendanceIntoForm();
+    $("setupNotice").classList.add("hidden");
   } catch (err) {
     console.error(err);
   }
