@@ -4,8 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tilmelding til logeaftener</title>
+
   <link rel="stylesheet" href="style.css" />
-  <link rel="icon" href="/Tilmelding/icons/icon-192.png">
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+
+  <meta name="theme-color" content="#6f1d2a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Tilmelding" />
 </head>
 <body>
   <div class="wrap">
@@ -354,5 +362,48 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script type="module" src="app.js"></script>
+
+  <script>
+    (function () {
+      if (!("serviceWorker" in navigator)) return;
+
+      window.addEventListener("load", async () => {
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+
+          for (const registration of registrations) {
+            const sameAppScope = registration.scope.includes("/Tilmelding/");
+            if (!sameAppScope) continue;
+
+            const worker =
+              registration.active ||
+              registration.waiting ||
+              registration.installing;
+
+            const isCurrentWorker =
+              worker &&
+              worker.scriptURL &&
+              worker.scriptURL.includes("/Tilmelding/sw.js");
+
+            if (!isCurrentWorker) {
+              await registration.unregister();
+            }
+          }
+        } catch (err) {
+          console.warn("Kunne ikke rydde gamle service workers:", err);
+        }
+
+        try {
+          const registration = await navigator.serviceWorker.register("./sw.js?v=2026-04-04-1", {
+            scope: "./"
+          });
+
+          registration.update();
+        } catch (err) {
+          console.error("Service worker kunne ikke registreres:", err);
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
